@@ -1,8 +1,16 @@
 const bili = require("./modules/bili.js");
-const strings = ["V1bR4y1V7QJ"];
+const strings = ["BV1uq4y1e7ZY"];
+
+// strings.forEach(str => {
+//     bili.download_video(str)
+//         .then((res) => {
+//             console.log(res);
+//         })
+// });
+
 
 strings.forEach(str => {
-    bili.download_video(str)
+    bili.download_audio(str)
         .then((res) => {
             console.log(res);
         })

@@ -191,6 +191,7 @@ const download_video = (str) => {
                 videoStreams = res.dash.video;
                 audioStreams = res.dash.audio;
                 return download_video_stream(get_clarity(videoStreams), videoInfo);
+                // return download_video_stream(videoStreams[0].baseUrl, videoInfo);
             })
             .then((res) => {
                 videoStreamPath = res;
@@ -200,6 +201,29 @@ const download_video = (str) => {
                 return marge_stream(videoStreamPath, audioStreamPath, videoInfo);
             }).then((res) => {
                 resolve(res);
+            })
+    })
+}
+
+// 下载音频
+const download_audio = (str) => {
+    return new Promise((resolve, reject) => {
+        let videoInfo;
+        let audioStreams;
+        let audioStreamPath;
+        get_video_info(str)
+            .then((res) => {
+                videoInfo = res;
+                return get_download_url(videoInfo);
+            })
+            .then((res) => {
+                audioStreams = res.dash.audio;
+                return download_audio_stream(audioStreams[0].baseUrl, videoInfo);
+            }).then((res) => {
+                audioStreamPath = res;
+                let outputPath = path.resolve(__dirname, `../media/${videoInfo.bvid}.mp3`);
+                fs.renameSync(audioStreamPath, outputPath);
+                resolve(outputPath);
             })
     })
 }
@@ -224,5 +248,6 @@ module.exports = {
     get_video_info,
     get_download_url,
     download_video,
-    marge_stream
+    marge_stream,
+    download_audio
 }
