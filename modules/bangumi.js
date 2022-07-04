@@ -1,0 +1,133 @@
+const axios = require("axios");
+// const path = require("path");
+// const fs = require("fs");
+const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+const ffmpeg = require('fluent-ffmpeg');
+ffmpeg.setFfmpegPath(ffmpegPath);
+
+const downloadVideo = require("./downloadVideo.js");
+
+let cookie = null; // 保存cookie
+
+// 清晰度
+const bangumiDefinition = {
+    "360p": 16,
+    "480p": 32,
+    "720p": 64,
+    "720p60": 74,
+    "1080p": 80,
+    "1080p+": 112,
+    "1080p60": 116
+}
+
+// headers
+const headers = {
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.84 Safari/537.36",
+    "origin": "https: //www.bilibili.com",
+    "referer": "https://www.bilibili.com",
+    "X-Real-ip": "116.17.147.20"
+}
+
+// 下载番剧
+const download_bangumi = async(nameStr, definition) => {
+    let bangumiInfo; // 番剧信息
+    bangumiInfo = await get_bangumi_by_name(nameStr)
+        .then((bangumiInfo) => {
+            return bangumiInfo;
+        })
+    const eps = bangumiInfo.episodes; // 所有的剧集
+    for (let i = 0; i < eps.length; i++) {
+        try {
+            let a = await download_one_ep(eps[i], definition);
+        } catch (err) {
+            console.log(err);
+        }
+    }
+    console.log("下载完成");
+}
+
+// 通过名字查询番剧信息
+const get_bangumi_by_name = (nameStr) => {
+    return new Promise((resolve, reject) => {
+        axios(encodeURI(`http://api.bilibili.com/x/web-interface/search/type?search_type=media_bangumi&keyword=${nameStr}`))
+            .then((res) => {
+                if (res.data && res.data.data && res.data.data.result.length > 0) {
+                    console.log(`下载番剧${res.data.data.result[0].title}中...`);
+                    return axios(`http://api.bilibili.com/pgc/view/web/season?season_id=${res.data.data.result[0].season_id}`)
+                } else {
+                    reject("没有番剧信息");
+                }
+            })
+            .then((res) => {
+                resolve(res.data.result);
+            })
+    })
+}
+
+// 下载单集番剧
+const download_one_ep = (ep, definition) => {
+    return new Promise((resolve, reject) => {
+        let videoStreams;
+        let aduioStreams;
+        let videoStream;
+        let aduioStream;
+        let videoPath;
+        let audioPath;
+        console.log(`下载${ep.title}：${ep.long_title}中`);
+        set_headers(ep, definition) // 可能需要cookie，设置headers
+            .then(() => {
+                return axios({
+                    url: `https://api.bilibili.com/pgc/player/web/playurl?bvid=${ep.bvid}&epid=${ep.id}&cid=${ep.cid}&fnval=16`,
+                    headers: headers
+                })
+            })
+            .then((res) => {
+                if (!res.data.result || !res.data.result.dash) {
+                    throw new Error("权限不足");
+                } else {
+                    videoStreams = res.data.result.dash.video;
+                    aduioStreams = res.data.result.dash.audio;
+                    videoStream = downloadVideo.get_clarity(videoStreams, definition);
+                    aduioStream = aduioStreams[0].baseUrl;
+                    return downloadVideo.download_video_stream(videoStream);
+                }
+
+            })
+            .then((res) => {
+                videoPath = res;
+                return downloadVideo.download_audio_stream(aduioStream);
+            }).then((res) => {
+                audioPath = res;
+                return downloadVideo.marge_stream(videoPath, audioPath, ep.long_title);
+            })
+            .then(() => {
+                resolve();
+            })
+            .catch((err) => {
+                // console.log(err + "1");
+                reject(err);
+            })
+
+    })
+
+}
+
+// 设置headers
+const set_headers = (ep, definition) => {
+    return new Promise((resolve, reject) => {
+        if (definition > 64 && ep.badge != "" && cookie == null) {
+            // 需要登录，拿cookie，暂时没写
+            resolve();
+        } else {
+            resolve();
+        }
+    })
+}
+
+
+
+module.exports = {
+    bangumiDefinition,
+    download_bangumi,
+    get_bangumi_by_name
+}

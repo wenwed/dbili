@@ -105,8 +105,9 @@ const get_download_url = (videoInfo) => {
 }
 
 // 下载视频流
-const download_video_stream = (url, videoInfo) => {
+const download_video_stream = (url) => {
     return new Promise((resolve, reject) => {
+        console.log("视频流下载中");
         axios({
                 url: url,
                 method: "get",
@@ -123,6 +124,7 @@ const download_video_stream = (url, videoInfo) => {
                 const writer = fs.createWriteStream(filePath);
                 res.data.pipe(writer);
                 writer.on("finish", () => {
+                    console.log("视频流下载成功");
                     resolve(filePath);
                 })
                 writer.on("error", (err) => {})
@@ -131,8 +133,9 @@ const download_video_stream = (url, videoInfo) => {
 }
 
 // 下载音频流
-const download_audio_stream = (url, videoInfo) => {
+const download_audio_stream = (url) => {
     return new Promise((resolve, reject) => {
+        console.log("音频流下载中");
         axios({
                 url: url,
                 method: "get",
@@ -149,6 +152,7 @@ const download_audio_stream = (url, videoInfo) => {
                 const writer = fs.createWriteStream(filePath);
                 res.data.pipe(writer);
                 writer.on("finish", () => {
+                    console.log("音频流下载成功");
                     resolve(filePath);
                 })
                 writer.on("error", (err) => {})
@@ -157,14 +161,15 @@ const download_audio_stream = (url, videoInfo) => {
 }
 
 // 合并视频音频流
-const marge_stream = (videoPath, audioPath, videoInfo) => {
+const marge_stream = (videoPath, audioPath, videoName) => {
+    console.log("合并视频流音频流中");
     return new Promise((resolve, reject) => {
         let tmpPath = path.resolve(__dirname, `../media/${new Date().getTime()}.mp4`);
-        let outputPath = path.resolve(__dirname, `../media/${videoInfo.bvid}.mp4`);
+        let outputPath = path.resolve(__dirname, `../media/${videoName}.mp4`);
         ffmpeg(videoPath)
             .mergeAdd(audioPath)
             .on("end", (stdout, stderr) => {
-                console.log("merge completed!");
+                console.log("下载完成");
                 delete_file(videoPath);
                 delete_file(audioPath);
                 fs.renameSync(tmpPath, outputPath);
@@ -195,11 +200,14 @@ const download_video = (str) => {
             })
             .then((res) => {
                 videoStreamPath = res;
-                return download_audio_stream(audioStreams[audioStreams.length - 1].baseUrl, videoInfo);
-            }).then((res) => {
+                // return download_audio_stream(audioStreams[audioStreams.length - 1].baseUrl, videoInfo);
+                return download_audio_stream(audioStreams[0].baseUrl, videoInfo);
+            })
+            .then((res) => {
                 audioStreamPath = res;
-                return marge_stream(videoStreamPath, audioStreamPath, videoInfo);
-            }).then((res) => {
+                return marge_stream(videoStreamPath, audioStreamPath, videoInfo.bvid);
+            })
+            .then((res) => {
                 resolve(res);
             })
     })
@@ -233,14 +241,14 @@ const delete_file = (path) => {
     fs.unlink(path, () => {});
 }
 
-// 获取某个清晰的下载链接
-const get_clarity = (videoStreams, clarityId = 16) => {
+// 获取某个清晰度的下载链接，默认360P
+const get_clarity = (videoStreams, definitionId = 16) => {
     for (let i = 0; i < videoStreams.length; i++) {
-        if (videoStreams[i].id === clarityId) {
+        if (videoStreams[i].id === definitionId) {
             return videoStreams[i].baseUrl;
         }
     }
-    throw new Error("此视频没有720的清晰度");
+    throw new Error("此视频没有对应的清晰度");
 }
 
 module.exports = {
@@ -249,5 +257,8 @@ module.exports = {
     get_download_url,
     download_video,
     marge_stream,
-    download_audio
+    download_audio,
+    get_clarity,
+    download_video_stream,
+    download_audio_stream,
 }
