@@ -1,13 +1,12 @@
 const axios = require("axios");
-// const path = require("path");
-// const fs = require("fs");
 const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
 const ffmpeg = require('fluent-ffmpeg');
 ffmpeg.setFfmpegPath(ffmpegPath);
 
 const downloadVideo = require("./downloadVideo.js");
+const login = require("./login.js");
 
-let cookie = null; // 保存cookie
+let hasCookie = false; // 保存cookie
 
 // 清晰度
 const bangumiDefinition = {
@@ -25,20 +24,18 @@ const headers = {
     "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.84 Safari/537.36",
     "origin": "https: //www.bilibili.com",
     "referer": "https://www.bilibili.com",
-    "X-Real-ip": "116.17.147.20"
+    "X-Real-ip": "116.17.147.20",
 }
 
 // 下载番剧
 const download_bangumi = async(nameStr, definition) => {
     let bangumiInfo; // 番剧信息
     bangumiInfo = await get_bangumi_by_name(nameStr)
-        .then((bangumiInfo) => {
-            return bangumiInfo;
-        })
     const eps = bangumiInfo.episodes; // 所有的剧集
     for (let i = 0; i < eps.length; i++) {
+        // for (let i = 0; i < 1; i++) {
         try {
-            let a = await download_one_ep(eps[i], definition);
+            await download_one_ep(eps[i], definition);
         } catch (err) {
             console.log(err);
         }
@@ -87,8 +84,8 @@ const download_one_ep = (ep, definition) => {
                 } else {
                     videoStreams = res.data.result.dash.video;
                     aduioStreams = res.data.result.dash.audio;
-                    videoStream = downloadVideo.get_clarity(videoStreams, definition);
-                    aduioStream = aduioStreams[0].baseUrl;
+                    videoStream = downloadVideo.get_clarity(videoStreams, definition); // 获取视频下载链接
+                    aduioStream = aduioStreams[0].baseUrl; // 获取音频下载链接
                     return downloadVideo.download_video_stream(videoStream);
                 }
 
@@ -104,7 +101,6 @@ const download_one_ep = (ep, definition) => {
                 resolve();
             })
             .catch((err) => {
-                // console.log(err + "1");
                 reject(err);
             })
 
@@ -115,9 +111,17 @@ const download_one_ep = (ep, definition) => {
 // 设置headers
 const set_headers = (ep, definition) => {
     return new Promise((resolve, reject) => {
-        if (definition > 64 && ep.badge != "" && cookie == null) {
-            // 需要登录，拿cookie，暂时没写
-            resolve();
+        if ((definition > 64 || ep.badge != "") && hasCookie == false) {
+            // 需要登录，拿cookie
+            login.get_cookie()
+                .then((cookie) => {
+                    hasCookie = true;
+                    headers.cookie = cookie;
+                    resolve();
+                })
+                .catch((err) => {
+                    reject(err);
+                })
         } else {
             resolve();
         }
