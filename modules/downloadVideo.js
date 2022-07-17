@@ -14,6 +14,7 @@ class VideoId {
 
     constructor(str) {
         this.ID = str;
+        this.page = 1;
         this.isBV = false;
         this.isAV = false;
         this.isValid = false;
@@ -36,19 +37,31 @@ class VideoId {
         this.isAV = false;
         this.isValid = true;
     }
+
+    set_page(p) {
+        this.page = p;
+    }
 }
 
 // 判断视频号类型
 const is_av_or_Bv = (str) => {
+    // more like videoID parser
+    const reg = /^((BV[a-zA-Z0-9]{10})|(av[0-9]{1,20}))(\?p=[0-9]{1,3})?/
+    const match = str.match(reg);
     const res = new VideoId(str);
-    const BVReg = /BV[a-zA-Z0-9]{10}/;
-    const AVReg = /av[0-9]{0,20}/;
-    if (str.match(BVReg)) {
-        res.change_to_BV();
-    } else if (str.match(AVReg)) {
-        res.change_to_AV();
-    } else {
+    if (!match) {
         res.change_to_invalid();
+    } else {
+        const split = match[0].split("?p=");
+        if (split.length > 1) {
+            res.set_page(Number(split[1]))
+            res.ID = split[0]
+        }
+        if (split[0].startsWith('a')) {
+            res.change_to_AV();
+        } else if (split[0].startsWith('B')) {
+            res.change_to_BV()
+        }
     }
     return res;
 }
@@ -63,7 +76,7 @@ const get_video_info = (arg) => {
             videoId = arg;
         }
         if (!videoId || videoId.isValid) {
-            reject(new Error("参数错误"));
+            reject("参数错误");
         }
         let infoUrl = "https://api.bilibili.com/x/web-interface/view?"
         if (videoId.isBV) {
@@ -74,9 +87,17 @@ const get_video_info = (arg) => {
         axios(infoUrl)
             .then((res) => {
                 if (res.data.code === 0) {
-                    resolve(res.data.data);
+                    const payload = {};
+                    payload.cid = res.data.data.pages[videoId.page - 1].cid;
+                    payload.part = res.data.data.pages[videoId.page - 1].part;
+                    payload.title = res.data.data.title;
+                    payload.title += (res.data.data.videos > 1) ? `-第${videoId.page}分P-${payload.part}` : "";
+                    payload.bvid = res.data.data.bvid;
+                    payload.aid = res.data.data.aid;
+                    // console.log(payload);
+                    resolve(payload);
                 } else {
-                    reject(res.data);
+                    reject(dat.message);
                 }
             })
             .catch((err) => {
@@ -92,7 +113,7 @@ const cut_av_id = (avId) => {
 }
 
 // 获取视频下载链接
-const get_download_url = (videoInfo) => {
+const get_download_url = (videoInfo, pages) => {
     return new Promise((resolve, reject) => {
         const avid = videoInfo.aid;
         const cid = videoInfo.cid;
@@ -132,6 +153,8 @@ const download_video_stream = (url) => {
     })
 }
 
+
+
 // 下载音频流
 const download_audio_stream = (url) => {
     return new Promise((resolve, reject) => {
@@ -170,8 +193,8 @@ const marge_stream = (videoPath, audioPath, videoName) => {
             .mergeAdd(audioPath)
             .on("end", (stdout, stderr) => {
                 console.log("下载完成");
-                delete_file(videoPath);
-                delete_file(audioPath);
+                delete_file(videoPath); // 删掉视频流地址
+                delete_file(audioPath); // 删掉音频流地址
                 fs.renameSync(tmpPath, outputPath);
                 resolve(outputPath);
             })

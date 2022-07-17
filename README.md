@@ -14,7 +14,7 @@ dbili.download_video("av114514")
     console.log(videoPath);
 })
 
-bili.download_bangumi("邻家索菲", bili.bangumiDefinition["720p"]);
+dbili.download_bangumi("邻家索菲", dbili.bangumiDefinition["720p"]);
 ```
 
 ### 参数说明
@@ -22,8 +22,8 @@ bili.download_bangumi("邻家索菲", bili.bangumiDefinition["720p"]);
 
 | 方法             | 说明                           | 参数   |
 | ---------------- | ------------------------------ | ------ |
-| download_video(videoStr) | 下载视频               | videoStr：av号或bv号 |
-| download_audio(videoStr) | 下载音频       | videoStr：av号或bv号 |
+| download_video(videoStr) | 下载视频               | videoStr：av号或bv号，加分p（?p=xxx） |
+| download_audio(videoStr) | 下载音频       | videoStr：av号或bv号，加分p（?p=xxx） |
 | download_bangumi(bangumi, definition) | 下载番剧 | bangumi：番剧名称；definition：清晰度 |
 
 ### 特别
