@@ -228,7 +228,7 @@ const download_video = (str) => {
             })
             .then((res) => {
                 audioStreamPath = res;
-                return marge_stream(videoStreamPath, audioStreamPath, videoInfo.bvid);
+                return marge_stream(videoStreamPath, audioStreamPath, videoInfo.title);
             })
             .then((res) => {
                 resolve(res);
