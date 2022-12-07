@@ -3,7 +3,7 @@ const dbili = require("./index.js");
 // const strings1 = ["BV1uq4y1e7ZY"];
 const str = "BV1hT4y1v7Vg";
 // const str = "BV1uq4y1e7ZY";
-// const strings = ["BV1uq4y1e7ZY"];
+const strings = ["BV1hg411B7Rz"];
 
 // strings1.forEach(str => {
 //     dbili.download_video(str)
@@ -12,12 +12,12 @@ const str = "BV1hT4y1v7Vg";
 //         })
 // });
 
-// strings2.forEach(str => {
-//     dbili.download_video(str)
-//         .then((res) => {
-//             console.log(res);
-//         })
-// });
+strings.forEach(str => {
+    dbili.download_video(str)
+        .then((res) => {
+            console.log(res);
+        })
+});
 
 
 // 清晰度键值
@@ -42,33 +42,33 @@ const str = "BV1hT4y1v7Vg";
 
 // console.log(dbili.cast_cookie_to_Str(cookie));
 
-// 下载视频所有分p
-const download_all_page = async(BV) => {
-    let url = `https://api.bilibili.com/x/player/pagelist?bvid=${BV}&jsonp=jsonp`;
-    let list = await axios(url)
-        .then((res) => {
-            return res.data.data;
-        })
-    for (let i = 1; i <= list.length; i++) {
-        let pageFile = await dbili.download_video(`${BV}?p=${i}`);
-        console.log(pageFile);
-    }
-}
+// // 下载视频所有分p
+// const download_all_page = async(BV) => {
+//     let url = `https://api.bilibili.com/x/player/pagelist?bvid=${BV}&jsonp=jsonp`;
+//     let list = await axios(url)
+//         .then((res) => {
+//             return res.data.data;
+//         })
+//     for (let i = 1; i <= list.length; i++) {
+//         let pageFile = await dbili.download_video(`${BV}?p=${i}`);
+//         console.log(pageFile);
+//     }
+// }
 
-// 下载视频合集所有视频
-const download_all_collection = async(BV) => {
-    const INITIAL_STATE = /<script>window\.__INITIAL_STATE__=(.+);\(function\(\)\{var s;\(s=document\.currentScript\|\|document\.scripts\[document\.scripts\.length-1\]\)\.parentNode\.removeChild\(s\);\}\(\)\);<\/script>/;
-    let url = `https://www.bilibili.com/video/${BV}`;
-    let allVideoInfo = await axios(url)
-        .then((res) => {
-            let infoStr = res.data.match(INITIAL_STATE)[1];
-            let infoObj = JSON.parse(infoStr);
-            return infoObj.sectionsInfo.sections[0].episodes;
-        })
-    for (let i = 0; i < allVideoInfo.length; i++) {
-        let videoFile = await dbili.download_video(`av${allVideoInfo[i].aid}`);
-        console.log(videoFile);
-    }
-}
+// // 下载视频合集所有视频
+// const download_all_collection = async(BV) => {
+//     const INITIAL_STATE = /<script>window\.__INITIAL_STATE__=(.+);\(function\(\)\{var s;\(s=document\.currentScript\|\|document\.scripts\[document\.scripts\.length-1\]\)\.parentNode\.removeChild\(s\);\}\(\)\);<\/script>/;
+//     let url = `https://www.bilibili.com/video/${BV}`;
+//     let allVideoInfo = await axios(url)
+//         .then((res) => {
+//             let infoStr = res.data.match(INITIAL_STATE)[1];
+//             let infoObj = JSON.parse(infoStr);
+//             return infoObj.sectionsInfo.sections[0].episodes;
+//         })
+//     for (let i = 0; i < allVideoInfo.length; i++) {
+//         let videoFile = await dbili.download_video(`av${allVideoInfo[i].aid}`);
+//         console.log(videoFile);
+//     }
+// }
 
-download_all_collection("BV1T94y1X7uP");
+// download_all_collection("BV1T94y1X7uP");
