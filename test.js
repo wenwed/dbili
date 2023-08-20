@@ -1,24 +1,12 @@
 const axios = require("axios");
 const dbili = require("./index.js");
-// const strings1 = ["BV1uq4y1e7ZY"];
-const str = "BV1hT4y1v7Vg";
-// const str = "BV1uq4y1e7ZY";
-const strings = ["BV1hg411B7Rz"];
+// const strings = ["BV1T94y1X7uP"];
 
-// strings1.forEach(str => {
-//     dbili.download_video(str)
-//         .then((res) => {
-//             console.log(res);
-//         })
+// strings.forEach((str) => {
+//     dbili.download_video(str).then((res) => {
+//         console.log(res);
+//     });
 // });
-
-strings.forEach(str => {
-    dbili.download_video(str)
-        .then((res) => {
-            console.log(res);
-        })
-});
-
 
 // 清晰度键值
 // {
@@ -31,7 +19,7 @@ strings.forEach(str => {
 //     "1080p60": 116
 // }
 
-// dbili.download_bangumi("骸骨骑士大人奇幻世界", dbili.bangumiDefinition["1080p"]);
+dbili.download_bangumi("路人女主的养成方法", dbili.bangumiDefinition["1080p"]);
 
 // let cookie = ["SESSDATA=d7a2363a%2C1672752204%2C73e9e%2A71; 546464",
 //     "bili_jct=d0c4e80d5febf5f5070a0a9c72abdb89; 465465456152 45",
