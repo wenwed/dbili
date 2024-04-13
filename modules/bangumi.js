@@ -5,37 +5,26 @@ ffmpeg.setFfmpegPath(ffmpegPath);
 
 const downloadVideo = require("./downloadVideo.js");
 const login = require("./login.js");
-
-let hasCookie = false; // 保存cookie
-
-// 清晰度
-const bangumiDefinition = {
-    "360p": 16,
-    "480p": 32,
-    "720p": 64,
-    "720p60": 74,
-    "1080p": 80,
-    "1080p+": 112,
-    "1080p60": 116,
-};
-
-// headers
-const headers = {
-    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.84 Safari/537.36",
-    origin: "https://www.bilibili.com",
-    referer: "https://www.bilibili.com",
-    cookie: "buvid3=114514DE-DAAG-AAAA-1145-1145143AAAA114514infoc;",
-};
+const seasonIDHashTable = {};
 
 // 下载番剧
-const download_bangumi = async(nameStr, definition) => {
+const download_bangumi = async (
+    nameStr,
+    definition,
+    folderPath = "./media"
+) => {
     let bangumiInfo; // 番剧信息
     bangumiInfo = await get_bangumi_by_name(nameStr);
     const eps = bangumiInfo.episodes; // 所有的剧集
     for (let i = 0; i < eps.length; i++) {
         // for (let i = 0; i < 1; i++) {
         try {
-            await download_one_ep(eps[i], definition);
+            await download_one_ep(
+                eps[i],
+                seasonIDHashTable[nameStr],
+                definition,
+                folderPath
+            );
         } catch (err) {
             console.log(err);
         }
@@ -47,11 +36,11 @@ const download_bangumi = async(nameStr, definition) => {
 const get_bangumi_by_name = (nameStr) => {
     return new Promise((resolve, reject) => {
         axios({
-                url: encodeURI(
-                    `https://api.bilibili.com/x/web-interface/wbi/search/all/v2?__refresh__=true&_extra=&context=&page=1&page_size=42&order=&duration=&from_source=&from_spmid=333.337&keyword=${nameStr}`
-                ),
-                headers: headers,
-            })
+            url: encodeURI(
+                `https://api.bilibili.com/x/web-interface/wbi/search/all/v2?__refresh__=true&_extra=&context=&page=1&page_size=42&order=&duration=&from_source=&from_spmid=333.337&keyword=${nameStr}`
+            ),
+            headers: global.dBiliHeader,
+        })
             .then((res) => {
                 if (
                     res.data &&
@@ -70,10 +59,11 @@ const get_bangumi_by_name = (nameStr) => {
                     if (media_bangumi === null) {
                         reject("没有番剧信息");
                     }
-                    console.log(`下载番剧${media_bangumi.title}中...`);
+                    console.log(`下载番剧${media_bangumi[0].title}中...`);
+                    seasonIDHashTable[nameStr] = media_bangumi[0].season_id;
                     return axios({
                         url: `https://api.bilibili.com/pgc/view/web/season?season_id=${media_bangumi[0].season_id}`,
-                        headers: headers,
+                        headers: global.dBiliHeader,
                     });
                 } else {
                     reject("没有番剧信息");
@@ -89,7 +79,7 @@ const get_bangumi_by_name = (nameStr) => {
 };
 
 // 下载单集番剧
-const download_one_ep = (ep, definition) => {
+const download_one_ep = (ep, seasonID, definition, folderPath) => {
     return new Promise((resolve, reject) => {
         let videoStreams;
         let aduioStreams;
@@ -98,10 +88,13 @@ const download_one_ep = (ep, definition) => {
         let videoPath;
         let audioPath;
         console.log(`下载${ep.title}：${ep.long_title}中`);
+        const headers = Object.assign(global.dBiliHeader);
+        headers.Origin = "https://www.bilibili.com";
+        headers.Referer = `https://www.bilibili.com/bangumi/play/ss${seasonID}?from_spmid=666.4.mylist.0`;
         set_headers(ep, definition) // 可能需要cookie，设置headers
             .then(() => {
                 return axios({
-                    url: `https://api.bilibili.com/pgc/player/web/playurl?bvid=${ep.bvid}&epid=${ep.id}&cid=${ep.cid}&fnval=16`,
+                    url: `https://api.bilibili.com/pgc/player/web/playurl?support_multi_audio=true&bvid=${ep.bvid}&qn=80&fnver=0&epid=${ep.ep_id}&cid=${ep.cid}&fnval=4048&fourk=1&gaia_source=&from_client=BROWSER&is_main_page=true&need_fragment=true`,
                     headers: headers,
                 });
             })
@@ -128,7 +121,8 @@ const download_one_ep = (ep, definition) => {
                 return downloadVideo.marge_stream(
                     videoPath,
                     audioPath,
-                    ep.long_title
+                    ep.long_title,
+                    folderPath
                 );
             })
             .then(() => {
@@ -143,14 +137,15 @@ const download_one_ep = (ep, definition) => {
 // 设置headers
 const set_headers = (ep, definition) => {
     return new Promise((resolve, reject) => {
-        if ((definition > 64 || ep.badge !== "") && hasCookie == false) {
+        if (
+            (definition > 64 || ep.badge !== "") &&
+            global.dBiliHasCookie === false
+        ) {
             // 需要登录，拿cookie
             login
                 .get_cookie()
                 .then((cookie) => {
-                    hasCookie = true;
-                    headers.cookie = cookie;
-                    resolve();
+                    resolve(cookie);
                 })
                 .catch((err) => {
                     reject(err);
@@ -162,7 +157,6 @@ const set_headers = (ep, definition) => {
 };
 
 module.exports = {
-    bangumiDefinition,
     download_bangumi,
     get_bangumi_by_name,
 };

@@ -5,12 +5,26 @@ const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path;
 const ffmpeg = require("fluent-ffmpeg");
 ffmpeg.setFfmpegPath(ffmpegPath);
 
-// 视频号类型
-class VideoId {
-    ID;
-    isBV;
-    isAV;
-    isValid;
+// 清晰度
+const DEFINITION = Object.freeze({
+    "360p": 16,
+    "480p": 32,
+    "720p": 64,
+    "720p60": 74,
+    "1080p": 80,
+    "1080p+": 112,
+    "1080p60": 116,
+});
+
+/**
+ * 视频信息类
+ */
+class VideoInfo {
+    ID; // 传入值
+    isBV; // 是否为BV号
+    isAV; // 是否为AV号
+    isValid; // 是否不是BV/AV号
+    page; // 第几分p
 
     constructor(str) {
         this.ID = str;
@@ -43,64 +57,69 @@ class VideoId {
     }
 }
 
-// 判断视频号类型
-const is_av_or_Bv = (str) => {
-    // more like videoID parser
-    const reg = /^((BV[a-zA-Z0-9]{10})|(av[0-9]{1,20}))(\?p=[0-9]{1,3})?/;
+/**
+ * 判断视频号类型
+ * @param {*} str AV/BV号
+ * @param {*} page 分p
+ * @returns
+ */
+const is_av_or_Bv = (str, page) => {
+    // more like VideoInfo parser
+    const reg = /^((BV[a-zA-Z0-9]{10})|(av[0-9]{1,20}))/;
     const match = str.match(reg);
-    const res = new VideoId(str);
+    const res = new VideoInfo(str);
     if (!match) {
         res.change_to_invalid();
     } else {
-        const split = match[0].split("?p=");
-        if (split.length > 1) {
-            res.set_page(Number(split[1]));
-            res.ID = split[0];
-        }
-        if (split[0].startsWith("a")) {
+        res.set_page(page);
+        if (str.startsWith("a")) {
             res.change_to_AV();
-        } else if (split[0].startsWith("B")) {
+        } else if (str.startsWith("B")) {
             res.change_to_BV();
         }
     }
     return res;
 };
 
-// 获取视频信息
-const get_video_info = (arg) => {
+/**
+ * 获取视频信息
+ * @param {*} arg  BV/AV号字符串，或类VideoInfo的实例
+ * @param {*} page 分p
+ * @returns
+ */
+const get_video_info = (arg, page) => {
     return new Promise((resolve, reject) => {
-        let videoId;
+        let VideoInfo;
         if (typeof arg === "string") {
-            videoId = is_av_or_Bv(arg);
+            VideoInfo = is_av_or_Bv(arg, page);
         } else if (
             typeof arg === "object" &&
-            arg.constructor.name === "VideoId"
+            arg.constructor.name === "VideoInfo"
         ) {
-            videoId = arg;
+            VideoInfo = arg;
         }
-        if (!videoId || videoId.isValid) {
+        if (!VideoInfo || VideoInfo.isValid) {
             reject("参数错误");
         }
         let infoUrl = "https://api.bilibili.com/x/web-interface/view?";
-        if (videoId.isBV) {
-            infoUrl = infoUrl + `bvid=${videoId.ID}`;
-        } else if (videoId.isAV) {
-            infoUrl = infoUrl + `aid=${cut_av_id(videoId.ID)}`;
+        if (VideoInfo.isBV) {
+            infoUrl = infoUrl + `bvid=${VideoInfo.ID}`;
+        } else if (VideoInfo.isAV) {
+            infoUrl = infoUrl + `aid=${cut_av_id(VideoInfo.ID)}`;
         }
         axios(infoUrl)
             .then((res) => {
                 if (res.data.code === 0) {
                     const payload = {};
-                    payload.cid = res.data.data.pages[videoId.page - 1].cid;
-                    payload.part = res.data.data.pages[videoId.page - 1].part;
+                    payload.cid = res.data.data.pages[VideoInfo.page - 1].cid;
+                    payload.part = res.data.data.pages[VideoInfo.page - 1].part;
                     payload.title = res.data.data.title;
                     payload.title +=
-                        res.data.data.videos > 1 ?
-                        `-第${videoId.page}分P-${payload.part}` :
-                        "";
+                        res.data.data.videos > 1
+                            ? `-第${VideoInfo.page}分P-${payload.part}`
+                            : "";
                     payload.bvid = res.data.data.bvid;
                     payload.aid = res.data.data.aid;
-                    // console.log(payload);
                     resolve(payload);
                 } else {
                     reject(dat.message);
@@ -112,38 +131,54 @@ const get_video_info = (arg) => {
     });
 };
 
-// 截取av号数字
+/**
+ * 截取av号数字
+ * @param {*} avId  AV号
+ * @returns
+ */
 const cut_av_id = (avId) => {
     const AVReg = /[0-9]+/;
     return avId.match(AVReg)[0];
 };
 
-// 获取视频下载链接
-const get_download_url = (videoInfo, pages) => {
+/**
+ * 获取视频下载链接
+ * @param {*} videoInfo 视频信息
+ * @returns
+ */
+const get_download_url = (videoInfo) => {
     return new Promise((resolve, reject) => {
         const avid = videoInfo.aid;
         const cid = videoInfo.cid;
         let url = `http://api.bilibili.com/x/player/playurl?avid=${avid}&cid=${cid}&fnval=16`;
-        axios(url).then((res) => {
+        axios({
+            url,
+            method: "get",
+            headers: global.dBiliHeader,
+        }).then((res) => {
             resolve(res.data.data);
         });
     });
 };
 
-// 下载视频流
-const download_video_stream = (url) => {
+/**
+ * 下载视频流
+ * @param {*} url 视频流地址
+ * @returns
+ */
+const download_video_stream = (url, videoInfo) => {
     return new Promise((resolve, reject) => {
         console.log("视频流下载中");
+        const headers = Object.assign(global.dBiliHeader);
+        headers.Origin = "https://www.bilibili.com";
+        if (typeof videoInfo !== "undefined") {
+            headers.Referer = `https://www.bilibili.com/video/${videoInfo.str}`;
+        }
         axios({
             url: url,
             method: "get",
             responseType: "stream",
-            headers: {
-                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.84 Safari/537.36",
-                origin: "https: //www.bilibili.com",
-                referer: "https://www.bilibili.com",
-                "X-Real-ip": "116.17.41.11",
-            },
+            headers: headers,
         }).then((res) => {
             const filePath = path.resolve(
                 __dirname,
@@ -160,20 +195,24 @@ const download_video_stream = (url) => {
     });
 };
 
-// 下载音频流
-const download_audio_stream = (url) => {
+/**
+ * 下载音频流
+ * @param {*} url 音频流地址
+ * @returns
+ */
+const download_audio_stream = (url, videoInfo) => {
     return new Promise((resolve, reject) => {
         console.log("音频流下载中");
+        const headers = Object.assign(global.dBiliHeader);
+        headers.Origin = "https://www.bilibili.com";
+        if (typeof videoInfo !== "undefined") {
+            headers.Referer = `https://www.bilibili.com/video/${videoInfo.str}`;
+        }
         axios({
             url: url,
             method: "get",
             responseType: "stream",
-            headers: {
-                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.84 Safari/537.36",
-                origin: "https: //www.bilibili.com",
-                referer: "https://www.bilibili.com",
-                "X-Real-ip": "116.17.41.11",
-            },
+            headers: headers,
         }).then((res) => {
             const filePath = path.resolve(
                 __dirname,
@@ -190,15 +229,20 @@ const download_audio_stream = (url) => {
     });
 };
 
-// 合并视频音频流
-const marge_stream = (videoPath, audioPath, videoName) => {
+/**
+ * 合并视频音频流
+ * @param {*} videoPath 视频地址
+ * @param {*} audioPath 音频地址
+ * @param {*} videoName 视频名称
+ * @param {*} folderPath 下载地址
+ * @returns
+ */
+const marge_stream = (videoPath, audioPath, videoName, folderPath) => {
     console.log("合并视频流音频流中");
     return new Promise((resolve, reject) => {
-        let tmpPath = path.resolve(
-            __dirname,
-            `../media/${new Date().getTime()}.mp4`
-        );
-        let outputPath = path.resolve(__dirname, `../media/${videoName}.mp4`);
+        let tmpPath = path.resolve(folderPath, `${new Date().getTime()}.mp4`);
+        let outputPath = path.resolve(folderPath, `${videoName}.mp4`);
+
         ffmpeg(videoPath)
             .mergeAdd(audioPath)
             .on("end", (stdout, stderr) => {
@@ -212,15 +256,22 @@ const marge_stream = (videoPath, audioPath, videoName) => {
     });
 };
 
-// 下载视频
-const download_video = (str) => {
+/**
+ * 下载B站视频
+ * @param {*} str BV/AV号
+ * @param {*} definition 清晰度
+ * @param {*} page 分p
+ * @param {*} folderPath 地址
+ * @returns
+ */
+const download_video = (str, definition, page, folderPath = "./media") => {
     return new Promise((resolve, reject) => {
         let videoInfo;
         let videoStreams;
         let audioStreams;
         let videoStreamPath;
         let audioStreamPath;
-        get_video_info(str)
+        get_video_info(str, page)
             .then((res) => {
                 videoInfo = res;
                 return get_download_url(videoInfo);
@@ -229,7 +280,7 @@ const download_video = (str) => {
                 videoStreams = res.dash.video;
                 audioStreams = res.dash.audio;
                 return download_video_stream(
-                    get_clarity(videoStreams),
+                    get_clarity(videoStreams, definition),
                     videoInfo
                 );
                 // return download_video_stream(videoStreams[0].baseUrl, videoInfo);
@@ -247,7 +298,8 @@ const download_video = (str) => {
                 return marge_stream(
                     videoStreamPath,
                     audioStreamPath,
-                    videoInfo.title
+                    videoInfo.title,
+                    folderPath
                 );
             })
             .then((res) => {
@@ -256,13 +308,19 @@ const download_video = (str) => {
     });
 };
 
-// 下载音频
-const download_audio = (str) => {
+/**
+ * 下载音频
+ * @param {*} str BV/AV号
+ * @param {*} page 分p
+ * @param {*} folderPath 下载地址
+ * @returns
+ */
+const download_audio = (str, page, folderPath) => {
     return new Promise((resolve, reject) => {
         let videoInfo;
         let audioStreams;
         let audioStreamPath;
-        get_video_info(str)
+        get_video_info(str, page)
             .then((res) => {
                 videoInfo = res;
                 return get_download_url(videoInfo);
@@ -277,8 +335,8 @@ const download_audio = (str) => {
             .then((res) => {
                 audioStreamPath = res;
                 let outputPath = path.resolve(
-                    __dirname,
-                    `../media/${videoInfo.bvid}.mp3`
+                    folderPath,
+                    `${videoInfo.bvid}.mp3`
                 );
                 fs.renameSync(audioStreamPath, outputPath);
                 resolve(outputPath);
@@ -287,8 +345,8 @@ const download_audio = (str) => {
 };
 
 // 删除文件
-const delete_file = (path) => {
-    fs.unlink(path, () => {});
+const delete_file = (folderPath) => {
+    fs.unlink(folderPath, () => {});
 };
 
 // 获取某个清晰度的下载链接，默认360P
@@ -298,7 +356,9 @@ const get_clarity = (videoStreams, definitionId = 32) => {
             return videoStreams[i].baseUrl;
         }
     }
-    throw new Error("此视频没有对应的清晰度");
+    throw new Error(
+        "此视频没有对应的清晰度，如果是会员专属视频则需要登录再尝试下载"
+    );
 };
 
 module.exports = {
@@ -311,4 +371,5 @@ module.exports = {
     get_clarity,
     download_video_stream,
     download_audio_stream,
+    DEFINITION,
 };

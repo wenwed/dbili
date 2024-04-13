@@ -15,7 +15,10 @@ const headers = {
     referer: "https://www.bilibili.com",
 };
 
-// 请求登录key
+/**
+ * 请求登录二维码key
+ * @returns 登录二维码key
+ */
 const get_oauth_key = () => {
     return axios({
         url: "https://passport.bilibili.com/x/passport-login/web/qrcode/generate?source=main_mini",
@@ -25,7 +28,10 @@ const get_oauth_key = () => {
     });
 };
 
-// 启动服务器展示二维码
+/**
+ * 启动服务器展示登录二维码
+ * @param {*} oauthKey 登录二维码key
+ */
 const show_qr_code = (oauthKey) => {
     server = http.createServer((req, res) => {
         var code = qrcode.image(
@@ -39,11 +45,14 @@ const show_qr_code = (oauthKey) => {
 
     server.listen(11451, () => {
         console.log("浏览器访问：http://127.0.0.1:11451 扫码登录");
-        cp.exec("start http://127.0.0.1:11451");
+        // cp.exec("start http://127.0.0.1:11451"); // windows系统启动浏览器
     });
 };
 
-// 获取cookie
+/**
+ * 获取登录cookie
+ * @returns
+ */
 const get_cookie = () => {
     let oauthKey;
     let clock; // 时钟
@@ -73,22 +82,15 @@ const get_cookie = () => {
                     },
                     (err, res, body) => {
                         const data = JSON.parse(body);
-                        // if (data.status === true) {
-                        //     let cookie = res.headers["set-cookie"];
-                        //     let cookieStr = cast_cookie_to_Str(cookie);
-                        //     clearInterval(clock);
-                        //     lock = false;
-                        //     server.close();
-                        //     resolve(cookieStr);
-                        // } else {
-                        //     lock = false;
-                        // }
                         if (data.data.code === 0) {
                             let cookie = res.headers["set-cookie"];
                             let cookieStr = cast_cookie_to_Str(cookie);
                             clearInterval(clock);
                             lock = false;
                             server.close();
+                            global.dBiliCookie = cookieStr;
+                            global.dBiliHasCookie = true;
+                            global.dBiliHeader.cookie = cookieStr;
                             resolve(cookieStr);
                         } else {
                             lock = false;
@@ -100,7 +102,11 @@ const get_cookie = () => {
     });
 };
 
-// 将获取的cookie转为字符串
+/**
+ * 将获取的cookie转为字符串
+ * @param {*} cookie
+ * @returns
+ */
 const cast_cookie_to_Str = (cookie) => {
     let res = "";
     for (let i = 0; i < cookie.length; i++) {
