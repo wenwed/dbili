@@ -115,9 +115,9 @@ const get_video_info = (arg, page) => {
                     payload.part = res.data.data.pages[VideoInfo.page - 1].part;
                     payload.title = res.data.data.title;
                     payload.title +=
-                        res.data.data.videos > 1
-                            ? `-第${VideoInfo.page}分P-${payload.part}`
-                            : "";
+                        res.data.data.videos > 1 ?
+                        `-第${VideoInfo.page}分P-${payload.part}` :
+                        "";
                     payload.bvid = res.data.data.bvid;
                     payload.aid = res.data.data.aid;
                     resolve(payload);
@@ -161,13 +161,20 @@ const get_download_url = (videoInfo) => {
     });
 };
 
+// 确保文件夹存在
+const ensure_dir = async(dir) => {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true }); // recursive 确保创建多级目录
+    }
+};
+
 /**
  * 下载视频流
  * @param {*} url 视频流地址
  * @returns
  */
 const download_video_stream = (url, videoInfo) => {
-    return new Promise((resolve, reject) => {
+    return new Promise(async(resolve, reject) => {
         console.log("视频流下载中");
         const headers = Object.assign(global.dBiliHeader);
         headers.Origin = "https://www.bilibili.com";
@@ -175,23 +182,33 @@ const download_video_stream = (url, videoInfo) => {
             headers.Referer = `https://www.bilibili.com/video/${videoInfo.str}`;
         }
         axios({
-            url: url,
-            method: "get",
-            responseType: "stream",
-            headers: headers,
-        }).then((res) => {
-            const filePath = path.resolve(
-                __dirname,
-                `../tmp/${new Date().getTime()}.mp4`
-            );
-            const writer = fs.createWriteStream(filePath);
-            res.data.pipe(writer);
-            writer.on("finish", () => {
-                console.log("视频流下载成功");
-                resolve(filePath);
+                url: url,
+                method: "get",
+                responseType: "stream",
+                headers: headers,
+            })
+            .then((res) => {
+                let filePath = path.resolve(__dirname, `../tmp`);
+                ensure_dir(filePath);
+                filePath = path.resolve(
+                    filePath,
+                    `/${new Date().getTime()}.mp4`
+                );
+                const writer = fs.createWriteStream(filePath);
+                res.data.pipe(writer);
+                writer.on("finish", () => {
+                    console.log("视频流下载成功");
+                    resolve(filePath);
+                });
+                writer.on("error", (err) => {
+                    console.error("视频流写入失败:", err);
+                    reject(err);
+                });
+            })
+            .catch((err) => {
+                console.error("视频流下载失败:", err);
+                reject(err);
             });
-            writer.on("error", (err) => {});
-        });
     });
 };
 
@@ -239,7 +256,8 @@ const download_audio_stream = (url, videoInfo) => {
  */
 const marge_stream = (videoPath, audioPath, videoName, folderPath) => {
     console.log("合并视频流音频流中");
-    return new Promise((resolve, reject) => {
+    return new Promise(async(resolve, reject) => {
+        await ensure_dir(folderPath);
         let tmpPath = path.resolve(folderPath, `${new Date().getTime()}.mp4`);
         let outputPath = path.resolve(folderPath, `${videoName}.mp4`);
 
