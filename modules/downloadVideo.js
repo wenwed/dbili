@@ -162,7 +162,7 @@ const get_download_url = (videoInfo) => {
 };
 
 // 确保文件夹存在
-const ensure_dir = async(dir) => {
+const ensure_dir = (dir) => {
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true }); // recursive 确保创建多级目录
     }
@@ -174,13 +174,15 @@ const ensure_dir = async(dir) => {
  * @returns
  */
 const download_video_stream = (url, videoInfo) => {
-    return new Promise(async(resolve, reject) => {
+    return new Promise((resolve, reject) => {
         console.log("视频流下载中");
         const headers = Object.assign(global.dBiliHeader);
         headers.Origin = "https://www.bilibili.com";
         if (typeof videoInfo !== "undefined") {
             headers.Referer = `https://www.bilibili.com/video/${videoInfo.str}`;
         }
+        let filePath = path.resolve(__dirname, `../tmp`);
+        ensure_dir(filePath); // 确保临时目录存在
         axios({
                 url: url,
                 method: "get",
@@ -188,8 +190,6 @@ const download_video_stream = (url, videoInfo) => {
                 headers: headers,
             })
             .then((res) => {
-                let filePath = path.resolve(__dirname, `../tmp`);
-                ensure_dir(filePath);
                 filePath = path.resolve(
                     filePath,
                     `/${new Date().getTime()}.mp4`
@@ -225,16 +225,15 @@ const download_audio_stream = (url, videoInfo) => {
         if (typeof videoInfo !== "undefined") {
             headers.Referer = `https://www.bilibili.com/video/${videoInfo.str}`;
         }
+        let filePath = path.resolve(__dirname, `../tmp`);
+        ensure_dir(filePath); // 确保临时目录存在
         axios({
             url: url,
             method: "get",
             responseType: "stream",
             headers: headers,
         }).then((res) => {
-            const filePath = path.resolve(
-                __dirname,
-                `../tmp/${new Date().getTime()}.mp3`
-            );
+            filePath = path.resolve(filePath, `/${new Date().getTime()}.mp3`);
             const writer = fs.createWriteStream(filePath);
             res.data.pipe(writer);
             writer.on("finish", () => {
@@ -256,8 +255,8 @@ const download_audio_stream = (url, videoInfo) => {
  */
 const marge_stream = (videoPath, audioPath, videoName, folderPath) => {
     console.log("合并视频流音频流中");
-    return new Promise(async(resolve, reject) => {
-        await ensure_dir(folderPath);
+    return new Promise((resolve, reject) => {
+        ensure_dir(folderPath); // 确保下载目录存在
         let tmpPath = path.resolve(folderPath, `${new Date().getTime()}.mp4`);
         let outputPath = path.resolve(folderPath, `${videoName}.mp4`);
 
